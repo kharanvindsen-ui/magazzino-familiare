@@ -11,10 +11,26 @@ interface Props {
 
 type State = 'idle' | 'recording' | 'processing' | 'preview' | 'error' | 'success'
 
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number
+  results: SpeechRecognitionResultList
+}
+
+interface ISpeechRecognition extends EventTarget {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onresult: ((e: SpeechRecognitionEvent) => void) | null
+  onend: (() => void) | null
+  onerror: ((e: { error: string }) => void) | null
+  start(): void
+  stop(): void
+}
+
 declare global {
   interface Window {
-    SpeechRecognition: typeof SpeechRecognition
-    webkitSpeechRecognition: typeof SpeechRecognition
+    SpeechRecognition: new () => ISpeechRecognition
+    webkitSpeechRecognition: new () => ISpeechRecognition
   }
 }
 
@@ -25,7 +41,7 @@ export default function VoiceInput({ onConfirm, onClose }: Props) {
   const [parsed, setParsed] = useState<ParsedVoiceCommand | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const recRef = useRef<SpeechRecognition | null>(null)
+  const recRef = useRef<ISpeechRecognition | null>(null)
   const transcriptRef = useRef('')
 
   useEffect(() => {
