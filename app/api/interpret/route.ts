@@ -51,7 +51,8 @@ Restituisci un JSON con questa struttura esatta:
     const content = message.content[0]
     if (content.type !== 'text') throw new Error('Risposta non valida')
 
-    const jsonText = content.text.trim()
+    const raw = content.text.trim()
+    const jsonText = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
     const parsed: ParsedVoiceCommand = JSON.parse(jsonText)
 
     // Validazione base
