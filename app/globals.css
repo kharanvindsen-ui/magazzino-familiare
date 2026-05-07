@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900;
+  overscroll-behavior: none;
+}
+
+/* Bottom nav safe area for iOS */
+.pb-safe {
+  padding-bottom: calc(4rem + var(--safe-area-bottom));
+}
+
+/* Smooth scroll */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Stock bar animation */
+@keyframes stockBar {
+  from { width: 0%; }
+}
+.stock-bar {
+  animation: stockBar 0.6s ease-out forwards;
+}
+
+/* Pulse for recording */
+@keyframes recordPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+.recording-pulse {
+  animation: recordPulse 1s ease-in-out infinite;
+}
