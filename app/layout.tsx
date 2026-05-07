@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Magazzino Familiare',
+  title: 'Magazzino Materiali',
   description: 'Gestione scorte materiali di casa e lavoro con input vocale',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Magazzino',
+    title: 'Magazzino Materiali',
   },
   formatDetection: { telephone: false },
 }

@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Magazzino Familiare',
+    name: 'Magazzino Materiali',
     short_name: 'Magazzino',
     description: 'Gestione scorte materiali di casa e lavoro',
     start_url: '/',

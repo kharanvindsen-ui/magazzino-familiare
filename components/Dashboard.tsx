@@ -115,7 +115,7 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
         <div className="max-w-lg mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">🏠 Magazzino</h1>
+              <h1 className="text-xl font-bold text-gray-900">🏠 Magazzino Materiali</h1>
               <p className="text-xs text-gray-400">{materials.length} materiali</p>
             </div>
             {/* Indicatore connessione real-time */}
