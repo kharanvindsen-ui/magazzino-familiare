@@ -40,6 +40,11 @@ export interface Movement {
   material?: Material
 }
 
+export interface MaterialMatch {
+  material: Material
+  score: number
+}
+
 export interface ParsedVoiceCommand {
   material_name: string
   quantity: number

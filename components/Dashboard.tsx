@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Mic, Plus, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Material, ParsedVoiceCommand, Category, MacroCategory } from '@/lib/types'
+import { Material, MaterialMatch, ParsedVoiceCommand, Category, MacroCategory } from '@/lib/types'
 import MaterialCard from '@/components/MaterialCard'
 import VoiceInput from '@/components/VoiceInput'
 import StockAlert from '@/components/StockAlert'
@@ -94,31 +94,66 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
     return () => { es?.close(); clearTimeout(retryTimer) }
   }, [])
 
-  const findMaterialMatch = useCallback((name: string): Material | null => {
-    const normalize = (s: string) =>
-      s.toLowerCase()
+  const findMaterialMatches = useCallback((name: string): MaterialMatch[] => {
+    function normalize(s: string): string {
+      return s
+        .toLowerCase()
         .replace(/,/g, '.')
+        // "N unit e mezzo" → (N+0.5)unit  e.g. "2 mm e mezzo" → "2.5mm"
+        .replace(/(\d+(?:\.\d+)?)\s*(mm|cm|km|ml|cl|dl|mg|kg|pz|g|l|m)\b\s+e\s+mezzo\b/gi,
+          (_: string, n: string, u: string) => String(parseFloat(n) + 0.5) + u)
+        // "N e mezzo unit" → (N+0.5)unit
+        .replace(/(\d+(?:\.\d+)?)\s+e\s+mezzo\s*(mm|cm|km|ml|cl|dl|mg|kg|pz|g|l|m)\b/gi,
+          (_: string, n: string, u: string) => String(parseFloat(n) + 0.5) + u)
+        // "N e mezzo" (no unit) → (N+0.5)
+        .replace(/(\d+(?:\.\d+)?)\s+e\s+mezzo\b/gi,
+          (_: string, n: string) => String(parseFloat(n) + 0.5))
+        // "mezzo unit" → 0.5unit
+        .replace(/\bmezzo\s+(mm|cm|km|ml|cl|dl|mg|kg|pz|g|l|m)\b/gi, '0.5$1')
+        // digit space unit → merge
         .replace(/(\d)\s+(mm|cm|m|km|ml|cl|dl|l|mg|g|kg|pz)\b/g, '$1$2')
+        // strip Italian stopwords unlikely to appear in material names
+        .replace(/\b(da|di|del|dello|della|dei|degli|delle|per|il|lo|la|i|gli|le|un|uno|una)\b/gi, '')
         .replace(/\s+/g, ' ')
         .trim()
-    const normName = normalize(name)
-
-    const exact = materials.find(m => {
-      const n = normalize(m.name)
-      return n.includes(normName) || normName.includes(n)
-    })
-    if (exact) return exact
-
-    const nameWords = normName.split(' ').filter(Boolean)
-    let bestScore = 0
-    let bestMatch: Material | null = null
-    for (const m of materials) {
-      const mWords = normalize(m.name).split(' ').filter(Boolean)
-      const common = mWords.filter(w => nameWords.includes(w)).length
-      const score = common / Math.max(mWords.length, nameWords.length)
-      if (score > bestScore) { bestScore = score; bestMatch = m }
     }
-    return bestScore >= 0.5 ? bestMatch : null
+
+    function levenshtein(a: string, b: string): number {
+      const m = a.length, n = b.length
+      const dp: number[][] = []
+      for (let i = 0; i <= m; i++) {
+        dp[i] = []
+        for (let j = 0; j <= n; j++) dp[i][j] = i === 0 ? j : j === 0 ? i : 0
+      }
+      for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+          dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1])
+      return dp[m][n]
+    }
+
+    const normName = normalize(name)
+    const nameWords = normName.split(' ').filter(Boolean)
+
+    const scored = materials.map(m => {
+      const normM = normalize(m.name)
+      const mWords = normM.split(' ').filter(Boolean)
+
+      if (normM === normName || normM.includes(normName) || normName.includes(normM))
+        return { material: m, score: 1.0 }
+
+      const common = mWords.filter(w => nameWords.includes(w)).length
+      const wordScore = common / Math.max(mWords.length, nameWords.length, 1)
+
+      const dist = levenshtein(normName, normM)
+      const charScore = Math.max(0, 1 - dist / Math.max(normName.length, normM.length, 1))
+
+      return { material: m, score: 0.6 * wordScore + 0.4 * charScore }
+    })
+
+    return scored
+      .filter(r => r.score >= 0.3)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
   }, [materials])
 
   const handleVoiceConfirm = async (command: ParsedVoiceCommand, voiceText: string, matched: Material) => {
@@ -274,7 +309,7 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
         <VoiceInput
           onConfirm={handleVoiceConfirm}
           onClose={() => setShowVoice(false)}
-          findMatch={findMaterialMatch}
+          findMatches={findMaterialMatches}
         />
       )}
       {showAdd && (

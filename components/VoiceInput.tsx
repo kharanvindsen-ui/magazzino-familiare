@@ -2,12 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Mic, MicOff, Loader2, Check, X, RotateCcw } from 'lucide-react'
-import { ParsedVoiceCommand, Material } from '@/lib/types'
+import { ParsedVoiceCommand, Material, MaterialMatch } from '@/lib/types'
 
 interface Props {
   onConfirm: (command: ParsedVoiceCommand, voiceText: string, matched: Material) => Promise<void>
   onClose: () => void
-  findMatch: (name: string) => Material | null
+  findMatches: (name: string) => MaterialMatch[]
 }
 
 type State = 'idle' | 'recording' | 'processing' | 'preview' | 'error' | 'success'
@@ -35,18 +35,19 @@ declare global {
   }
 }
 
-export default function VoiceInput({ onConfirm, onClose, findMatch }: Props) {
+export default function VoiceInput({ onConfirm, onClose, findMatches }: Props) {
   const [state, setState] = useState<State>('idle')
   const [transcript, setTranscript] = useState('')
   const [interim, setInterim] = useState('')
   const [parsed, setParsed] = useState<ParsedVoiceCommand | null>(null)
-  const [matched, setMatched] = useState<Material | null | undefined>(undefined)
+  const [matched, setMatched] = useState<Material | null>(null)
+  const [candidates, setCandidates] = useState<MaterialMatch[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const recRef = useRef<ISpeechRecognition | null>(null)
   const transcriptRef = useRef('')
-  const findMatchRef = useRef(findMatch)
-  useEffect(() => { findMatchRef.current = findMatch }, [findMatch])
+  const findMatchesRef = useRef(findMatches)
+  useEffect(() => { findMatchesRef.current = findMatches }, [findMatches])
 
   useEffect(() => {
     return () => { recRef.current?.stop() }
@@ -63,7 +64,12 @@ export default function VoiceInput({ onConfirm, onClose, findMatch }: Props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: ParsedVoiceCommand = await res.json()
       setParsed(data)
-      setMatched(findMatchRef.current(data.material_name))
+
+      const results = findMatchesRef.current(data.material_name)
+      setCandidates(results)
+      // auto-match if top result is confident enough
+      setMatched(results.length > 0 && results[0].score >= 0.65 ? results[0].material : null)
+
       setState('preview')
     } catch {
       setError('Impossibile interpretare. Riprova o usa i tasti manuali.')
@@ -147,7 +153,8 @@ export default function VoiceInput({ onConfirm, onClose, findMatch }: Props) {
     setTranscript('')
     setInterim('')
     setParsed(null)
-    setMatched(undefined)
+    setMatched(null)
+    setCandidates([])
     setError(null)
     transcriptRef.current = ''
   }
@@ -187,7 +194,7 @@ export default function VoiceInput({ onConfirm, onClose, findMatch }: Props) {
               <div className="absolute inset-0 rounded-full bg-red-200 animate-ping" />
               <button
                 onClick={stopRecording}
-                className="relative recording-pulse w-20 h-20 rounded-full bg-red-500 text-white flex items-center justify-center shadow-xl"
+                className="relative w-20 h-20 rounded-full bg-red-500 text-white flex items-center justify-center shadow-xl"
               >
                 <MicOff size={32} />
               </button>
@@ -213,23 +220,47 @@ export default function VoiceInput({ onConfirm, onClose, findMatch }: Props) {
         )}
 
         {state === 'preview' && parsed && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-500 italic">
               "{transcript}"
             </div>
 
+            {/* Matched material or suggestions */}
             {matched ? (
               <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-sm">
                 <Check size={14} className="text-green-600 flex-shrink-0" />
                 <span className="text-gray-500 text-xs">Materiale:</span>
-                <span className="font-semibold text-green-800">{matched.name}</span>
+                <span className="font-semibold text-green-800 flex-1">{matched.name}</span>
+                <button
+                  onClick={() => setMatched(null)}
+                  className="text-gray-400 hover:text-gray-600 text-xs underline"
+                >
+                  cambia
+                </button>
+              </div>
+            ) : candidates.length > 0 ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 space-y-2">
+                <p className="text-xs text-yellow-800 font-medium">Seleziona il materiale corretto:</p>
+                {candidates.map(({ material, score }) => (
+                  <button
+                    key={material.id}
+                    onClick={() => setMatched(material)}
+                    className="w-full text-left flex items-center justify-between px-3 py-2 bg-white border border-yellow-200 rounded-lg hover:bg-yellow-50 transition-colors"
+                  >
+                    <span className="text-sm font-medium text-gray-800">{material.name}</span>
+                    <span className="text-xs text-gray-400 ml-2 flex-shrink-0">
+                      {Math.round(score * 100)}% simile
+                    </span>
+                  </button>
+                ))}
               </div>
             ) : (
               <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-700">
-                Materiale non trovato nel magazzino — riregistra con il nome esatto
+                Materiale non trovato — riregistra usando il nome esatto del magazzino
               </div>
             )}
 
+            {/* Movement details */}
             <div className={`rounded-xl p-4 ${parsed.movement_type === 'in' ? 'bg-green-50' : 'bg-red-50'}`}>
               <div className="flex justify-between items-start mb-3">
                 <span className={`text-xs font-bold px-2 py-1 rounded-full ${
