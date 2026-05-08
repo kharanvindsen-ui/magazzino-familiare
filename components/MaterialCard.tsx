@@ -22,7 +22,7 @@ export default function MaterialCard({ material, onQuickMove }: Props) {
     ? 'bg-orange-400'
     : 'bg-green-500'
 
-  const categoryColor = category?.type === 'lavoro' ? '#3B82F6' : '#10B981'
+  const categoryColor = category?.color ?? category?.macro_category?.color ?? '#3B82F6'
 
   return (
     <div className={`bg-white rounded-2xl p-4 shadow-sm border-l-4 ${

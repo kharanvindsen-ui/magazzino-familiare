@@ -1,20 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { X, AlertTriangle, ArrowRight, Trash2 } from 'lucide-react'
-import { Category } from '@/lib/types'
+import { Category, MacroCategory } from '@/lib/types'
 import { api } from '@/lib/api'
 
 interface Props {
   category: Category
   allCategories: Category[]
+  macros: MacroCategory[]
   onClose: () => void
   onDeleted: () => void
 }
 
 type Step = 'choose' | 'confirm-cascade'
 
-export default function DeleteCategoryModal({ category, allCategories, onClose, onDeleted }: Props) {
+export default function DeleteCategoryModal({ category, allCategories, macros, onClose, onDeleted }: Props) {
   const [materialsCount, setMaterialsCount] = useState<number | null>(null)
   const [step, setStep] = useState<Step>('choose')
   const [reassignTo, setReassignTo] = useState<string>('')
@@ -28,6 +29,15 @@ export default function DeleteCategoryModal({ category, allCategories, onClose, 
   }, [category.id])
 
   const others = allCategories.filter(c => c.id !== category.id)
+  const grouped = useMemo(() => {
+    const map = new Map<string | null, Category[]>()
+    for (const c of others) {
+      const key = c.macro_category_id ?? null
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(c)
+    }
+    return map
+  }, [others])
 
   const handleDeleteEmpty = async () => {
     setLoading(true); setError(null)
@@ -77,7 +87,9 @@ export default function DeleteCategoryModal({ category, allCategories, onClose, 
           <div className="text-2xl">{category.icon}</div>
           <div>
             <p className="font-semibold text-sm">{category.name}</p>
-            <p className="text-xs text-gray-500">{category.type === 'lavoro' ? '🔧 Lavoro' : '🏠 Casa'}</p>
+            <p className="text-xs text-gray-500">
+              {category.macro_category ? `${category.macro_category.icon} ${category.macro_category.name}` : 'Senza macro'}
+            </p>
           </div>
         </div>
 
@@ -129,16 +141,24 @@ export default function DeleteCategoryModal({ category, allCategories, onClose, 
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 mb-3"
                 >
                   <option value="">— Seleziona categoria di destinazione —</option>
-                  <optgroup label="🔧 Lavoro">
-                    {others.filter(c => c.type === 'lavoro').map(c => (
-                      <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="🏠 Casa">
-                    {others.filter(c => c.type === 'casa').map(c => (
-                      <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                    ))}
-                  </optgroup>
+                  {macros.map(m => {
+                    const items = grouped.get(m.id) ?? []
+                    if (items.length === 0) return null
+                    return (
+                      <optgroup key={m.id} label={`${m.icon} ${m.name}`}>
+                        {items.map(c => (
+                          <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                        ))}
+                      </optgroup>
+                    )
+                  })}
+                  {(grouped.get(null)?.length ?? 0) > 0 && (
+                    <optgroup label="Senza macro">
+                      {grouped.get(null)!.map(c => (
+                        <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 <button
                   onClick={handleReassign}

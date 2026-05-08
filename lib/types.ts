@@ -1,13 +1,21 @@
-export type CategoryType = 'lavoro' | 'casa'
 export type MovementType = 'in' | 'out'
+
+export interface MacroCategory {
+  id: string
+  name: string
+  icon: string
+  color: string
+  created_at: string
+}
 
 export interface Category {
   id: string
   name: string
-  type: CategoryType
+  macro_category_id: string | null
   color: string
   icon: string
   created_at: string
+  macro_category?: MacroCategory | null
 }
 
 export interface Material {
@@ -38,6 +46,6 @@ export interface ParsedVoiceCommand {
   movement_type: MovementType
   unit: string
   notes: string | null
-  category_hint: CategoryType | null
+  category_hint: string | null
   confidence: number
 }

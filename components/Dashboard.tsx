@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Mic, Plus, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Material, ParsedVoiceCommand, Category } from '@/lib/types'
+import { Material, ParsedVoiceCommand, Category, MacroCategory } from '@/lib/types'
 import MaterialCard from '@/components/MaterialCard'
 import VoiceInput from '@/components/VoiceInput'
 import StockAlert from '@/components/StockAlert'
@@ -11,7 +11,7 @@ import Navigation from '@/components/Navigation'
 import AddMaterialModal from '@/components/AddMaterialModal'
 import QuickMoveModal from '@/components/QuickMoveModal'
 
-type Filter = 'tutti' | 'lavoro' | 'casa'
+type Filter = 'tutti' | string
 
 interface Props {
   initialMaterials: Material[]
@@ -22,6 +22,7 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
   const [materials, setMaterials] = useState<Material[]>(initialMaterials)
   const [lowStock, setLowStock] = useState<Material[]>(initialLowStock)
   const [categories, setCategories] = useState<Category[]>([])
+  const [macros, setMacros] = useState<MacroCategory[]>([])
   const [filter, setFilter] = useState<Filter>('tutti')
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -33,37 +34,41 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
 
   useEffect(() => {
     api.categories.list().then(setCategories).catch(() => {})
+    api.macroCategories.list().then(setMacros).catch(() => {})
   }, [])
 
   const refresh = useCallback(async () => {
     setRefreshing(true)
     try {
-      const [mats, low] = await Promise.all([api.materials.list(), api.materials.lowStock()])
+      const [mats, low, cats, mcs] = await Promise.all([
+        api.materials.list(),
+        api.materials.lowStock(),
+        api.categories.list(),
+        api.macroCategories.list(),
+      ])
       setMaterials(mats)
       setLowStock(low)
+      setCategories(cats)
+      setMacros(mcs)
     } finally {
       setRefreshing(false)
     }
   }, [])
 
-  // Ref stabile per usare refresh dentro gli effetti senza re-subscribe
   const refreshRef = useRef(refresh)
   useEffect(() => { refreshRef.current = refresh }, [refresh])
 
-  // Refresh quando si torna sulla tab
   useEffect(() => {
     const onVisible = () => { if (!document.hidden) refreshRef.current() }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  // Polling di sicurezza ogni 15s — garantisce aggiornamento anche se SSE è lento
   useEffect(() => {
     const interval = setInterval(() => refreshRef.current(), 15_000)
     return () => clearInterval(interval)
   }, [])
 
-  // SSE — sincronizzazione real-time tra dispositivi
   useEffect(() => {
     let es: EventSource
     let retryTimer: ReturnType<typeof setTimeout>
@@ -111,22 +116,23 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
     setCategoryId(null)
   }
 
-  const subCategories = filter === 'tutti' ? [] : categories.filter(c => c.type === filter)
+  const subCategories = filter === 'tutti' ? [] : categories.filter(c => c.macro_category_id === filter)
 
   const visibleLowStock = lowStock.filter(m =>
-    filter === 'tutti' ? true : m.category?.type === filter
+    filter === 'tutti' ? true : m.category?.macro_category_id === filter
   )
 
   const filtered = materials.filter(m => {
     if (filter === 'tutti') return true
-    if (m.category?.type !== filter) return false
+    if (m.category?.macro_category_id !== filter) return false
     if (categoryId) return m.category_id === categoryId
     return true
   })
 
-  const counts = {
-    lavoro: materials.filter(m => m.category?.type === 'lavoro').length,
-    casa: materials.filter(m => m.category?.type === 'casa').length,
+  const macroCounts = new Map<string, number>()
+  for (const m of materials) {
+    const key = m.category?.macro_category_id
+    if (key) macroCounts.set(key, (macroCounts.get(key) ?? 0) + 1)
   }
 
   return (
@@ -138,7 +144,6 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
               <h1 className="text-xl font-bold text-gray-900">🏠 Magazzino Materiali</h1>
               <p className="text-xs text-gray-400">{materials.length} materiali</p>
             </div>
-            {/* Indicatore connessione real-time */}
             <div
               title={connected ? 'Sincronizzazione live attiva' : 'Connessione in corso...'}
               className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
@@ -163,24 +168,31 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
           </div>
         </div>
 
-        <div className="max-w-lg mx-auto px-4 pb-2 flex gap-2">
-          {(['tutti', 'lavoro', 'casa'] as Filter[]).map(f => (
-            <button
-              key={f}
-              onClick={() => handleFilterChange(f)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                filter === f
-                  ? f === 'lavoro' ? 'bg-blue-500 text-white'
-                  : f === 'casa' ? 'bg-green-500 text-white'
-                  : 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {f === 'tutti' ? `Tutti (${materials.length})`
-                : f === 'lavoro' ? `🔧 Lavoro (${counts.lavoro})`
-                : `🏠 Casa (${counts.casa})`}
-            </button>
-          ))}
+        <div className="max-w-lg mx-auto px-4 pb-2 flex gap-2 overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => handleFilterChange('tutti')}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+              filter === 'tutti' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Tutti ({materials.length})
+          </button>
+          {macros.map(m => {
+            const count = macroCounts.get(m.id) ?? 0
+            const active = filter === m.id
+            return (
+              <button
+                key={m.id}
+                onClick={() => handleFilterChange(m.id)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                  active ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                style={active ? { backgroundColor: m.color } : {}}
+              >
+                {m.icon} {m.name} ({count})
+              </button>
+            )
+          })}
         </div>
 
         {filter !== 'tutti' && subCategories.length > 0 && (
@@ -251,7 +263,7 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
           onClose={() => { setShowAdd(false); setPendingVoice(null) }}
           onCreated={refresh}
           defaultName={pendingVoice?.material_name}
-          defaultCategory={pendingVoice?.category_hint ?? undefined}
+          defaultMacroName={pendingVoice?.category_hint ?? null}
         />
       )}
       {quickMove && (

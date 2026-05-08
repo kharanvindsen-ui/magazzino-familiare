@@ -1,4 +1,4 @@
-import { Category, CategoryType, Material, Movement } from './types'
+import { Category, MacroCategory, Material, Movement } from './types'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
@@ -39,13 +39,13 @@ export const api = {
   },
   categories: {
     list: () => apiFetch<Category[]>('/api/categories'),
-    create: (name: string, type: CategoryType, icon: string, color: string) =>
+    create: (name: string, macroCategoryId: string | null, icon: string, color: string) =>
       apiFetch<Category>('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, type, icon, color }),
+        body: JSON.stringify({ name, macroCategoryId, icon, color }),
       }),
-    update: (id: string, updates: Partial<{ name: string; type: CategoryType; icon: string; color: string }>) =>
+    update: (id: string, updates: Partial<{ name: string; macro_category_id: string | null; icon: string; color: string }>) =>
       apiFetch<{ ok: boolean }>(`/api/categories/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -61,5 +61,30 @@ export const api = {
     },
     deleteCascade: (id: string) =>
       apiFetch<{ ok: boolean }>(`/api/categories/${id}?mode=cascade`, { method: 'DELETE' }),
+  },
+  macroCategories: {
+    list: () => apiFetch<MacroCategory[]>('/api/macro-categories'),
+    create: (name: string, icon: string, color: string) =>
+      apiFetch<MacroCategory>('/api/macro-categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, icon, color }),
+      }),
+    update: (id: string, updates: Partial<{ name: string; icon: string; color: string }>) =>
+      apiFetch<{ ok: boolean }>(`/api/macro-categories/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }),
+    categoriesCount: (id: string) =>
+      apiFetch<{ categoriesCount: number }>(`/api/macro-categories/${id}`),
+    deleteEmpty: (id: string) =>
+      apiFetch<{ ok: boolean }>(`/api/macro-categories/${id}?mode=empty`, { method: 'DELETE' }),
+    deleteWithReassign: (id: string, toId: string | null) => {
+      const qs = toId ? `mode=reassign&to=${encodeURIComponent(toId)}` : 'mode=reassign'
+      return apiFetch<{ ok: boolean }>(`/api/macro-categories/${id}?${qs}`, { method: 'DELETE' })
+    },
+    deleteDetach: (id: string) =>
+      apiFetch<{ ok: boolean }>(`/api/macro-categories/${id}?mode=detach`, { method: 'DELETE' }),
   },
 }

@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { Category, CategoryType, Material, Movement } from './types'
+import { Category, MacroCategory, Material, Movement } from './types'
 
 let _client: SupabaseClient | null = null
 
@@ -15,8 +15,57 @@ function client(): SupabaseClient {
   return _client
 }
 
+export async function getMacroCategories(): Promise<MacroCategory[]> {
+  const { data, error } = await client().from('macro_categories').select('*').order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createMacroCategory(name: string, icon: string, color: string): Promise<MacroCategory> {
+  const { data, error } = await client()
+    .from('macro_categories')
+    .insert({ name, icon, color })
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateMacroCategory(
+  id: string,
+  updates: Partial<Pick<MacroCategory, 'name' | 'icon' | 'color'>>
+): Promise<void> {
+  const { error } = await client().from('macro_categories').update(updates).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMacroCategory(id: string): Promise<void> {
+  const { error } = await client().from('macro_categories').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function countCategoriesByMacro(id: string): Promise<number> {
+  const { count, error } = await client()
+    .from('categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('macro_category_id', id)
+  if (error) throw error
+  return count ?? 0
+}
+
+export async function reassignMacroCategories(fromId: string, toId: string | null): Promise<void> {
+  const { error } = await client()
+    .from('categories')
+    .update({ macro_category_id: toId })
+    .eq('macro_category_id', fromId)
+  if (error) throw error
+}
+
 export async function getCategories(): Promise<Category[]> {
-  const { data, error } = await client().from('categories').select('*').order('name')
+  const { data, error } = await client()
+    .from('categories')
+    .select('*, macro_category:macro_categories(*)')
+    .order('name')
   if (error) throw error
   return data ?? []
 }
@@ -24,7 +73,7 @@ export async function getCategories(): Promise<Category[]> {
 export async function getMaterials(): Promise<Material[]> {
   const { data, error } = await client()
     .from('materials')
-    .select('*, category:categories(*)')
+    .select('*, category:categories(*, macro_category:macro_categories(*))')
     .order('name')
   if (error) throw error
   return data ?? []
@@ -39,7 +88,7 @@ export async function createMaterial(
   const { data, error } = await client()
     .from('materials')
     .insert({ name, category_id: categoryId, unit, current_stock: 0, min_stock: minStock })
-    .select('*, category:categories(*)')
+    .select('*, category:categories(*, macro_category:macro_categories(*))')
     .single()
   if (error) throw error
   return data
@@ -77,7 +126,7 @@ export async function applyMovement(
 export async function getMovements(limit = 50): Promise<Movement[]> {
   const { data, error } = await client()
     .from('movements')
-    .select('*, material:materials(name, unit, category:categories(*))')
+    .select('*, material:materials(name, unit, category:categories(*, macro_category:macro_categories(*)))')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error
@@ -87,7 +136,7 @@ export async function getMovements(limit = 50): Promise<Movement[]> {
 export async function getLowStockMaterials(): Promise<Material[]> {
   const { data, error } = await client()
     .from('materials')
-    .select('*, category:categories(*)')
+    .select('*, category:categories(*, macro_category:macro_categories(*))')
     .filter('min_stock', 'gt', 0)
   if (error) throw error
   return (data ?? []).filter((m: Material) => m.current_stock <= m.min_stock)
@@ -108,14 +157,14 @@ export async function deleteMaterial(id: string): Promise<void> {
 
 export async function createCategory(
   name: string,
-  type: CategoryType,
+  macroCategoryId: string | null,
   icon: string,
   color: string
 ): Promise<Category> {
   const { data, error } = await client()
     .from('categories')
-    .insert({ name, type, icon, color })
-    .select('*')
+    .insert({ name, macro_category_id: macroCategoryId, icon, color })
+    .select('*, macro_category:macro_categories(*)')
     .single()
   if (error) throw error
   return data
@@ -123,7 +172,7 @@ export async function createCategory(
 
 export async function updateCategory(
   id: string,
-  updates: Partial<Pick<Category, 'name' | 'type' | 'icon' | 'color'>>
+  updates: Partial<Pick<Category, 'name' | 'macro_category_id' | 'icon' | 'color'>>
 ): Promise<void> {
   const { error } = await client().from('categories').update(updates).eq('id', id)
   if (error) throw error

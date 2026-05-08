@@ -1,15 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { X, Check } from 'lucide-react'
-import { Category, MacroCategory } from '@/lib/types'
+import { MacroCategory } from '@/lib/types'
 import { api } from '@/lib/api'
 
 interface Props {
   onClose: () => void
   onSaved: () => void
-  initial?: Category
-  defaultMacroId?: string | null
+  initial?: MacroCategory
 }
 
 const PRESET_COLORS = [
@@ -19,27 +18,18 @@ const PRESET_COLORS = [
 ]
 
 const PRESET_EMOJIS = [
-  '📦', '🔧', '🔨', '⚡', '💡', '🪛', '🪚', '🧰',
-  '🏠', '🍳', '🧴', '🧻', '🧽', '🧹', '🧺', '🛒',
-  '📐', '🔩', '⚙️', '🪜', '🚿', '🛁', '🧯', '🌱',
+  '🔧', '🏠', '🚗', '🌱', '🏢', '🛠️', '💼', '🎨',
+  '⚡', '🪛', '📦', '🔨', '🍳', '🧴', '🧹', '🧺',
+  '🪜', '🚿', '⚙️', '🌳', '🐾', '🛒', '📐', '🎯',
 ]
 
-export default function CategoryFormModal({ onClose, onSaved, initial, defaultMacroId }: Props) {
+export default function MacroFormModal({ onClose, onSaved, initial }: Props) {
   const isEdit = Boolean(initial)
-  const [macros, setMacros] = useState<MacroCategory[]>([])
   const [name, setName] = useState(initial?.name ?? '')
-  const [macroId, setMacroId] = useState<string>(initial?.macro_category_id ?? defaultMacroId ?? '')
   const [icon, setIcon] = useState(initial?.icon ?? '📦')
   const [color, setColor] = useState(initial?.color ?? '#3B82F6')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.macroCategories.list().then(list => {
-      setMacros(list)
-      if (!macroId && list.length > 0) setMacroId(list[0].id)
-    }).catch(() => {})
-  }, [macroId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,14 +38,9 @@ export default function CategoryFormModal({ onClose, onSaved, initial, defaultMa
     setError(null)
     try {
       if (isEdit && initial) {
-        await api.categories.update(initial.id, {
-          name: name.trim(),
-          macro_category_id: macroId || null,
-          icon,
-          color,
-        })
+        await api.macroCategories.update(initial.id, { name: name.trim(), icon, color })
       } else {
-        await api.categories.create(name.trim(), macroId || null, icon, color)
+        await api.macroCategories.create(name.trim(), icon, color)
       }
       onSaved()
       onClose()
@@ -66,13 +51,11 @@ export default function CategoryFormModal({ onClose, onSaved, initial, defaultMa
     }
   }
 
-  const selectedMacro = macros.find(m => m.id === macroId)
-
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-[60]" onClick={onClose}>
       <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-lg font-bold">{isEdit ? 'Modifica categoria' : 'Nuova categoria'}</h2>
+          <h2 className="text-lg font-bold">{isEdit ? 'Modifica macro' : 'Nuova macro categoria'}</h2>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
             <X size={20} />
           </button>
@@ -83,12 +66,7 @@ export default function CategoryFormModal({ onClose, onSaved, initial, defaultMa
             <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-white shadow-sm">
               {icon}
             </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color }}>{name || 'Anteprima'}</p>
-              <p className="text-xs text-gray-500">
-                {selectedMacro ? `${selectedMacro.icon} ${selectedMacro.name}` : 'Nessuna macro'}
-              </p>
-            </div>
+            <p className="text-sm font-semibold" style={{ color }}>{name || 'Anteprima'}</p>
           </div>
 
           <div>
@@ -97,24 +75,10 @@ export default function CategoryFormModal({ onClose, onSaved, initial, defaultMa
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="Es. Elettricità"
+              placeholder="Es. Auto, Giardino, Ufficio"
               className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
               autoFocus
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Macro categoria</label>
-            <select
-              value={macroId}
-              onChange={e => setMacroId(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
-            >
-              <option value="">— Nessuna —</option>
-              {macros.map(m => (
-                <option key={m.id} value={m.id}>{m.icon} {m.name}</option>
-              ))}
-            </select>
           </div>
 
           <div>
@@ -176,7 +140,7 @@ export default function CategoryFormModal({ onClose, onSaved, initial, defaultMa
             className="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors"
           >
             <Check size={18} />
-            {loading ? 'Salvataggio...' : isEdit ? 'Salva modifiche' : 'Crea categoria'}
+            {loading ? 'Salvataggio...' : isEdit ? 'Salva modifiche' : 'Crea macro'}
           </button>
         </form>
       </div>
