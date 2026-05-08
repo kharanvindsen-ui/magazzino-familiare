@@ -79,24 +79,28 @@ export default function VoiceInput({ onConfirm, onClose }: Props) {
 
     const rec = new SR()
     rec.lang = 'it-IT'
-    rec.continuous = true
+    rec.continuous = false
     rec.interimResults = true
+
+    let interpreted = false
 
     rec.onresult = (e) => {
       let fin = ''
       let int = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      for (let i = 0; i < e.results.length; i++) {
         if (e.results[i].isFinal) fin += e.results[i][0].transcript
         else int += e.results[i][0].transcript
       }
       if (fin) {
-        transcriptRef.current += fin
-        setTranscript(transcriptRef.current)
+        transcriptRef.current = fin
+        setTranscript(fin)
       }
       setInterim(int)
     }
 
     rec.onend = () => {
+      if (interpreted) return
+      interpreted = true
       setInterim('')
       const text = transcriptRef.current.trim()
       if (text) interpret(text)
