@@ -111,7 +111,7 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
     setCategoryId(null)
   }
 
-  const subCategories = categories.filter(c => c.type === filter && filter !== 'tutti')
+  const subCategories = filter === 'tutti' ? [] : categories.filter(c => c.type === filter)
 
   const filtered = materials.filter(m => {
     if (filter === 'tutti') return true
