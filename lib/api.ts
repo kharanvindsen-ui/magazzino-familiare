@@ -1,4 +1,4 @@
-import { Category, Material, Movement } from './types'
+import { Category, CategoryType, Material, Movement } from './types'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
@@ -39,5 +39,27 @@ export const api = {
   },
   categories: {
     list: () => apiFetch<Category[]>('/api/categories'),
+    create: (name: string, type: CategoryType, icon: string, color: string) =>
+      apiFetch<Category>('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type, icon, color }),
+      }),
+    update: (id: string, updates: Partial<{ name: string; type: CategoryType; icon: string; color: string }>) =>
+      apiFetch<{ ok: boolean }>(`/api/categories/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }),
+    materialsCount: (id: string) =>
+      apiFetch<{ materialsCount: number }>(`/api/categories/${id}`),
+    deleteEmpty: (id: string) =>
+      apiFetch<{ ok: boolean }>(`/api/categories/${id}?mode=empty`, { method: 'DELETE' }),
+    deleteWithReassign: (id: string, toId: string | null) => {
+      const qs = toId ? `mode=reassign&to=${encodeURIComponent(toId)}` : 'mode=reassign'
+      return apiFetch<{ ok: boolean }>(`/api/categories/${id}?${qs}`, { method: 'DELETE' })
+    },
+    deleteCascade: (id: string) =>
+      apiFetch<{ ok: boolean }>(`/api/categories/${id}?mode=cascade`, { method: 'DELETE' }),
   },
 }

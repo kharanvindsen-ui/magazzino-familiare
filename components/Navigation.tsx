@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Package, History, AlertTriangle } from 'lucide-react'
+import { Home, Package, Tag, History, AlertTriangle } from 'lucide-react'
 
 const links = [
   { href: '/',           label: 'Home',       icon: Home },
   { href: '/materiali',  label: 'Materiali',  icon: Package },
+  { href: '/categorie',  label: 'Categorie',  icon: Tag },
   { href: '/movimenti',  label: 'Movimenti',  icon: History },
   { href: '/alert',      label: 'Alert',      icon: AlertTriangle },
 ]

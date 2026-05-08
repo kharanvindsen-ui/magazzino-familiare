@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { Category, Material, Movement } from './types'
+import { Category, CategoryType, Material, Movement } from './types'
 
 let _client: SupabaseClient | null = null
 
@@ -103,5 +103,65 @@ export async function updateMaterial(
 
 export async function deleteMaterial(id: string): Promise<void> {
   const { error } = await client().from('materials').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function createCategory(
+  name: string,
+  type: CategoryType,
+  icon: string,
+  color: string
+): Promise<Category> {
+  const { data, error } = await client()
+    .from('categories')
+    .insert({ name, type, icon, color })
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateCategory(
+  id: string,
+  updates: Partial<Pick<Category, 'name' | 'type' | 'icon' | 'color'>>
+): Promise<void> {
+  const { error } = await client().from('categories').update(updates).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await client().from('categories').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function countMaterialsByCategory(id: string): Promise<number> {
+  const { count, error } = await client()
+    .from('materials')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', id)
+  if (error) throw error
+  return count ?? 0
+}
+
+export async function listMaterialsByCategory(id: string): Promise<Material[]> {
+  const { data, error } = await client()
+    .from('materials')
+    .select('*')
+    .eq('category_id', id)
+    .order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function reassignCategoryMaterials(fromId: string, toId: string | null): Promise<void> {
+  const { error } = await client()
+    .from('materials')
+    .update({ category_id: toId })
+    .eq('category_id', fromId)
+  if (error) throw error
+}
+
+export async function deleteMaterialsByCategory(id: string): Promise<void> {
+  const { error } = await client().from('materials').delete().eq('category_id', id)
   if (error) throw error
 }
