@@ -113,6 +113,10 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
 
   const subCategories = filter === 'tutti' ? [] : categories.filter(c => c.type === filter)
 
+  const visibleLowStock = lowStock.filter(m =>
+    filter === 'tutti' ? true : m.category?.type === filter
+  )
+
   const filtered = materials.filter(m => {
     if (filter === 'tutti') return true
     if (m.category?.type !== filter) return false
@@ -209,7 +213,7 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
       </header>
 
       <main className="max-w-lg mx-auto px-4 pt-4 pb-safe">
-        <StockAlert materials={lowStock} />
+        <StockAlert materials={visibleLowStock} />
 
         {filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
