@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Mic, MicOff, Loader2, Check, X, RotateCcw } from 'lucide-react'
-import { ParsedVoiceCommand } from '@/lib/types'
+import { ParsedVoiceCommand, Material } from '@/lib/types'
 
 interface Props {
-  onConfirm: (command: ParsedVoiceCommand, voiceText: string) => Promise<void>
+  onConfirm: (command: ParsedVoiceCommand, voiceText: string, matched: Material) => Promise<void>
   onClose: () => void
+  findMatch: (name: string) => Material | null
 }
 
 type State = 'idle' | 'recording' | 'processing' | 'preview' | 'error' | 'success'
@@ -34,15 +35,18 @@ declare global {
   }
 }
 
-export default function VoiceInput({ onConfirm, onClose }: Props) {
+export default function VoiceInput({ onConfirm, onClose, findMatch }: Props) {
   const [state, setState] = useState<State>('idle')
   const [transcript, setTranscript] = useState('')
   const [interim, setInterim] = useState('')
   const [parsed, setParsed] = useState<ParsedVoiceCommand | null>(null)
+  const [matched, setMatched] = useState<Material | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const recRef = useRef<ISpeechRecognition | null>(null)
   const transcriptRef = useRef('')
+  const findMatchRef = useRef(findMatch)
+  useEffect(() => { findMatchRef.current = findMatch }, [findMatch])
 
   useEffect(() => {
     return () => { recRef.current?.stop() }
@@ -59,6 +63,7 @@ export default function VoiceInput({ onConfirm, onClose }: Props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: ParsedVoiceCommand = await res.json()
       setParsed(data)
+      setMatched(findMatchRef.current(data.material_name))
       setState('preview')
     } catch {
       setError('Impossibile interpretare. Riprova o usa i tasti manuali.')
@@ -123,10 +128,10 @@ export default function VoiceInput({ onConfirm, onClose }: Props) {
   const stopRecording = () => recRef.current?.stop()
 
   const handleConfirm = async () => {
-    if (!parsed) return
+    if (!parsed || !matched) return
     setSaving(true)
     try {
-      await onConfirm(parsed, transcript)
+      await onConfirm(parsed, transcript, matched)
       setState('success')
       setTimeout(onClose, 1200)
     } catch {
@@ -142,6 +147,7 @@ export default function VoiceInput({ onConfirm, onClose }: Props) {
     setTranscript('')
     setInterim('')
     setParsed(null)
+    setMatched(undefined)
     setError(null)
     transcriptRef.current = ''
   }
@@ -211,40 +217,37 @@ export default function VoiceInput({ onConfirm, onClose }: Props) {
             <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-500 italic">
               "{transcript}"
             </div>
-            <div className={`rounded-xl p-4 ${
-              parsed.movement_type === 'in' ? 'bg-green-50' : 'bg-red-50'
-            }`}>
+
+            {matched ? (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-sm">
+                <Check size={14} className="text-green-600 flex-shrink-0" />
+                <span className="text-gray-500 text-xs">Materiale:</span>
+                <span className="font-semibold text-green-800">{matched.name}</span>
+              </div>
+            ) : (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-700">
+                Materiale non trovato nel magazzino — riregistra con il nome esatto
+              </div>
+            )}
+
+            <div className={`rounded-xl p-4 ${parsed.movement_type === 'in' ? 'bg-green-50' : 'bg-red-50'}`}>
               <div className="flex justify-between items-start mb-3">
                 <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                  parsed.movement_type === 'in'
-                    ? 'bg-green-200 text-green-800'
-                    : 'bg-red-200 text-red-800'
+                  parsed.movement_type === 'in' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'
                 }`}>
                   {parsed.movement_type === 'in' ? '↑ CARICO' : '↓ SCARICO'}
                 </span>
                 <span className={`text-xs px-2 py-1 rounded-full ${
-                  parsed.confidence > 0.8
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-yellow-100 text-yellow-700'
+                  parsed.confidence > 0.8 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                 }`}>
                   {Math.round(parsed.confidence * 100)}% sicuro
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-gray-400 text-xs">Materiale</p>
-                  <p className="font-semibold capitalize">{parsed.material_name}</p>
-                </div>
-                <div>
                   <p className="text-gray-400 text-xs">Quantità</p>
                   <p className="font-semibold">{parsed.quantity} {parsed.unit}</p>
                 </div>
-                {parsed.category_hint && (
-                  <div>
-                    <p className="text-gray-400 text-xs">Categoria</p>
-                    <p className="font-semibold capitalize">{parsed.category_hint}</p>
-                  </div>
-                )}
                 {parsed.notes && (
                   <div>
                     <p className="text-gray-400 text-xs">Note</p>
@@ -253,6 +256,7 @@ export default function VoiceInput({ onConfirm, onClose }: Props) {
                 )}
               </div>
             </div>
+
             <div className="flex gap-3">
               <button
                 onClick={reset}
@@ -262,8 +266,8 @@ export default function VoiceInput({ onConfirm, onClose }: Props) {
               </button>
               <button
                 onClick={handleConfirm}
-                disabled={saving}
-                className="flex-1 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-60 flex items-center justify-center gap-2 font-semibold transition-colors"
+                disabled={saving || !matched}
+                className="flex-1 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-40 flex items-center justify-center gap-2 font-semibold transition-colors"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                 Conferma

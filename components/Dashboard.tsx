@@ -30,7 +30,6 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
   const [showVoice, setShowVoice] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [quickMove, setQuickMove] = useState<{ material: Material; type: 'in' | 'out' } | null>(null)
-  const [pendingVoice, setPendingVoice] = useState<ParsedVoiceCommand | null>(null)
 
   useEffect(() => {
     api.categories.list().then(setCategories).catch(() => {})
@@ -95,20 +94,36 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
     return () => { es?.close(); clearTimeout(retryTimer) }
   }, [])
 
-  const handleVoiceConfirm = async (command: ParsedVoiceCommand, voiceText: string) => {
-    const normalizedName = command.material_name.toLowerCase().trim()
-    const match = materials.find(m =>
-      m.name.toLowerCase().includes(normalizedName) ||
-      normalizedName.includes(m.name.toLowerCase())
-    )
-    if (match) {
-      await api.movements.create(match.id, command.quantity, command.movement_type, command.notes, voiceText)
-      await refresh()
-    } else {
-      setPendingVoice(command)
-      setShowVoice(false)
-      setShowAdd(true)
+  const findMaterialMatch = useCallback((name: string): Material | null => {
+    const normalize = (s: string) =>
+      s.toLowerCase()
+        .replace(/,/g, '.')
+        .replace(/(\d)\s+(mm|cm|m|km|ml|cl|dl|l|mg|g|kg|pz)\b/g, '$1$2')
+        .replace(/\s+/g, ' ')
+        .trim()
+    const normName = normalize(name)
+
+    const exact = materials.find(m => {
+      const n = normalize(m.name)
+      return n.includes(normName) || normName.includes(n)
+    })
+    if (exact) return exact
+
+    const nameWords = normName.split(' ').filter(Boolean)
+    let bestScore = 0
+    let bestMatch: Material | null = null
+    for (const m of materials) {
+      const mWords = normalize(m.name).split(' ').filter(Boolean)
+      const common = mWords.filter(w => nameWords.includes(w)).length
+      const score = common / Math.max(mWords.length, nameWords.length)
+      if (score > bestScore) { bestScore = score; bestMatch = m }
     }
+    return bestScore >= 0.5 ? bestMatch : null
+  }, [materials])
+
+  const handleVoiceConfirm = async (command: ParsedVoiceCommand, voiceText: string, matched: Material) => {
+    await api.movements.create(matched.id, command.quantity, command.movement_type, command.notes, voiceText)
+    await refresh()
   }
 
   const handleFilterChange = (f: Filter) => {
@@ -256,14 +271,16 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
       <Navigation alertCount={lowStock.length} />
 
       {showVoice && (
-        <VoiceInput onConfirm={handleVoiceConfirm} onClose={() => setShowVoice(false)} />
+        <VoiceInput
+          onConfirm={handleVoiceConfirm}
+          onClose={() => setShowVoice(false)}
+          findMatch={findMaterialMatch}
+        />
       )}
       {showAdd && (
         <AddMaterialModal
-          onClose={() => { setShowAdd(false); setPendingVoice(null) }}
+          onClose={() => setShowAdd(false)}
           onCreated={refresh}
-          defaultName={pendingVoice?.material_name}
-          defaultMacroName={pendingVoice?.category_hint ?? null}
         />
       )}
       {quickMove && (

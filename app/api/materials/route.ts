@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, categoryId, unit, minStock } = await req.json()
-    const material = await createMaterial(name, categoryId ?? null, unit, minStock ?? 0)
+    const { name, categoryId, unit, minStock, initialStock } = await req.json()
+    const material = await createMaterial(name, categoryId ?? null, unit, minStock ?? 0, initialStock ?? 0)
     return NextResponse.json(material)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

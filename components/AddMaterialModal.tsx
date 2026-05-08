@@ -21,6 +21,7 @@ export default function AddMaterialModal({ onClose, onCreated, defaultName = '',
   const [categoryId, setCategoryId] = useState('')
   const [unit, setUnit] = useState('pz')
   const [minStock, setMinStock] = useState(0)
+  const [initialStock, setInitialStock] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [voiceHintApplied, setVoiceHintApplied] = useState(false)
@@ -58,7 +59,7 @@ export default function AddMaterialModal({ onClose, onCreated, defaultName = '',
     setLoading(true)
     setError(null)
     try {
-      await api.materials.create(name.trim(), categoryId || null, unit, minStock)
+      await api.materials.create(name.trim(), categoryId || null, unit, minStock, initialStock)
       onCreated()
       onClose()
     } catch (err) {
@@ -141,16 +142,28 @@ export default function AddMaterialModal({ onClose, onCreated, defaultName = '',
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Scorta minima</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Scorta attuale</label>
               <input
                 type="number"
                 min="0"
                 step="0.5"
-                value={minStock}
-                onChange={e => setMinStock(parseFloat(e.target.value) || 0)}
+                value={initialStock}
+                onChange={e => setInitialStock(parseFloat(e.target.value) || 0)}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Scorta minima</label>
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={minStock}
+              onChange={e => setMinStock(parseFloat(e.target.value) || 0)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
           </div>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}

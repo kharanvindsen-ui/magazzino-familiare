@@ -29,6 +29,7 @@ Regole:
 - "ho comprato", "ho preso", "ho caricato", "ho ricevuto", "ho acquistato" → movement_type: "in"
 - Se non è chiaro, deduci dal contesto (es. "per l'impianto" = uso = "out")
 - ${macroHint}
+- Il nome del materiale deve rispecchiare ESATTAMENTE le parole pronunciate: non aggiungere, rimuovere o parafrasare (es. non aggiungere "diametro", "tipo", "modello" se non detti)
 - Normalizza le unità: mt/m/metri → "metri", pz/pezzo/pezzi → "pz", lt/litri/l → "litri", kg/chili → "kg"
 - Se le unità non sono specificate, usa "pz"
 - confidence: 0.0-1.0 (quanto sei sicuro dell'interpretazione)

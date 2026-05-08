@@ -83,11 +83,12 @@ export async function createMaterial(
   name: string,
   categoryId: string | null,
   unit: string,
-  minStock: number
+  minStock: number,
+  initialStock = 0
 ): Promise<Material> {
   const { data, error } = await client()
     .from('materials')
-    .insert({ name, category_id: categoryId, unit, current_stock: 0, min_stock: minStock })
+    .insert({ name, category_id: categoryId, unit, current_stock: initialStock, min_stock: minStock })
     .select('*, category:categories(*, macro_category:macro_categories(*))')
     .single()
   if (error) throw error

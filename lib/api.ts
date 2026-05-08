@@ -13,11 +13,11 @@ export const api = {
   materials: {
     list: () => apiFetch<Material[]>('/api/materials'),
     lowStock: () => apiFetch<Material[]>('/api/materials?low=true'),
-    create: (name: string, categoryId: string | null, unit: string, minStock: number) =>
+    create: (name: string, categoryId: string | null, unit: string, minStock: number, initialStock = 0) =>
       apiFetch<Material>('/api/materials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, categoryId, unit, minStock }),
+        body: JSON.stringify({ name, categoryId, unit, minStock, initialStock }),
       }),
     update: (id: string, updates: object) =>
       apiFetch<{ ok: boolean }>(`/api/materials/${id}`, {
