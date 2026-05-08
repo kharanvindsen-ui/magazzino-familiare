@@ -4,20 +4,14 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Magazzino Materiali',
   description: 'Gestione scorte materiali di casa e lavoro con input vocale',
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Magazzino',
-    startupImage: '/icons/apple-touch-icon.png',
   },
   formatDetection: { telephone: false },
   icons: {
-    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
-    icon: [
-      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
 }
 
