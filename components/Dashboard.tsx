@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Mic, Plus, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Material, ParsedVoiceCommand } from '@/lib/types'
+import { Material, ParsedVoiceCommand, Category } from '@/lib/types'
 import MaterialCard from '@/components/MaterialCard'
 import VoiceInput from '@/components/VoiceInput'
 import StockAlert from '@/components/StockAlert'
@@ -21,13 +21,19 @@ interface Props {
 export default function Dashboard({ initialMaterials, initialLowStock }: Props) {
   const [materials, setMaterials] = useState<Material[]>(initialMaterials)
   const [lowStock, setLowStock] = useState<Material[]>(initialLowStock)
+  const [categories, setCategories] = useState<Category[]>([])
   const [filter, setFilter] = useState<Filter>('tutti')
+  const [categoryId, setCategoryId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [connected, setConnected] = useState(false)
   const [showVoice, setShowVoice] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [quickMove, setQuickMove] = useState<{ material: Material; type: 'in' | 'out' } | null>(null)
   const [pendingVoice, setPendingVoice] = useState<ParsedVoiceCommand | null>(null)
+
+  useEffect(() => {
+    api.categories.list().then(setCategories).catch(() => {})
+  }, [])
 
   const refresh = useCallback(async () => {
     setRefreshing(true)
@@ -100,9 +106,19 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
     }
   }
 
-  const filtered = materials.filter(m =>
-    filter === 'tutti' ? true : m.category?.type === filter
-  )
+  const handleFilterChange = (f: Filter) => {
+    setFilter(f)
+    setCategoryId(null)
+  }
+
+  const subCategories = categories.filter(c => c.type === filter && filter !== 'tutti')
+
+  const filtered = materials.filter(m => {
+    if (filter === 'tutti') return true
+    if (m.category?.type !== filter) return false
+    if (categoryId) return m.category_id === categoryId
+    return true
+  })
 
   const counts = {
     lavoro: materials.filter(m => m.category?.type === 'lavoro').length,
@@ -143,11 +159,11 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
           </div>
         </div>
 
-        <div className="max-w-lg mx-auto px-4 pb-3 flex gap-2">
+        <div className="max-w-lg mx-auto px-4 pb-2 flex gap-2">
           {(['tutti', 'lavoro', 'casa'] as Filter[]).map(f => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => handleFilterChange(f)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 filter === f
                   ? f === 'lavoro' ? 'bg-blue-500 text-white'
@@ -162,6 +178,34 @@ export default function Dashboard({ initialMaterials, initialLowStock }: Props) 
             </button>
           ))}
         </div>
+
+        {filter !== 'tutti' && subCategories.length > 0 && (
+          <div className="max-w-lg mx-auto px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => setCategoryId(null)}
+              className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                !categoryId ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              Tutte
+            </button>
+            {subCategories.map(c => {
+              const count = materials.filter(m => m.category_id === c.id).length
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setCategoryId(categoryId === c.id ? null : c.id)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                    categoryId === c.id ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  style={categoryId === c.id ? { backgroundColor: c.color } : {}}
+                >
+                  {c.icon} {c.name} ({count})
+                </button>
+              )
+            })}
+          </div>
+        )}
       </header>
 
       <main className="max-w-lg mx-auto px-4 pt-4 pb-safe">

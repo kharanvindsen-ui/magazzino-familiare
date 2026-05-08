@@ -33,6 +33,15 @@ body {
   animation: stockBar 0.6s ease-out forwards;
 }
 
+/* Hide scrollbar on subcategory row */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Pulse for recording */
 @keyframes recordPulse {
   0%, 100% { transform: scale(1); opacity: 1; }
